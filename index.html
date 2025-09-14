@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Кросворд — День народження Google</title>
+    <style>
+      :root {
+        --grid-size: 12;
+        --cell: 38px;
+        --gap: 3px;
+        --ok: #c6f6c6;
+        --bad: #ffd7d7;
+        --num: #666;
+        --block: #111;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 16px;
+        background: #fafafa;
+      }
+      h1 {
+        margin: 0 0 12px;
+      }
+
+      .wrap {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 980px) {
+        .wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 480px) {
+        :root {
+          --cell: 30px;
+        }
+        body {
+          margin: 10px;
+        }
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(var(--grid-size), var(--cell));
+        grid-auto-rows: var(--cell);
+        gap: var(--gap);
+        background: #eee;
+        padding: var(--gap);
+        border-radius: 10px;
+        position: relative;
+      }
+      .cell {
+        position: relative;
+        width: var(--cell);
+        height: var(--cell);
+        background: #fff;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+      }
+      .cell.block {
+        background: var(--block);
+      }
+      .num {
+        position: absolute;
+        left: 4px;
+        top: 2px;
+        font-size: 11px;
+        color: var(--num);
+        user-select: none;
+      }
+      .cell input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        text-transform: uppercase;
+        text-align: center;
+        font-weight: 700;
+        font-size: 18px;
+        background: transparent;
+      }
+      @media (max-width: 480px) {
+        .cell input {
+          font-size: 16px;
+        }
+      }
+
+      .panel {
+        display: grid;
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 12px;
+        background: #fff;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+      }
+      .clues {
+        display: grid;
+        gap: 8px;
+        max-height: 50vh;
+        overflow: auto;
+      }
+      .clues b {
+        display: inline-block;
+        width: 26px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .row label {
+        font-size: 12px;
+        color: #555;
+        display: block;
+        margin-bottom: 4px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background: #fff;
+      }
+      button {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid #222;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      button.secondary {
+        background: #f9f9f9;
+        color: #111;
+      }
+      .hint {
+        font-size: 12px;
+        color: #666;
+      }
+      .score {
+        font-weight: 700;
+      }
+      .muted {
+        color: #777;
+      }
+
+      /* Стартовий модал */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      .modal {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        width: min(560px, 92vw);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+      .modal h2 {
+        margin: 0 0 8px;
+      }
+      .modal p {
+        margin: 6px 0;
+      }
+      .modal .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Кросворд до події «День народження Google»
+      <span class="muted" id="timer">00:00</span>
+    </h1>
+
+    <!-- Стартовий модал -->
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <h2>Готові почати?</h2>
+        <p>Коли натиснете <b>Почати</b>, з’являться підказки й піде таймер.</p>
+        <div class="row" style="margin-top: 8px">
+          <div>
+            <label>Назва події</label>
+            <input id="event" type="text" value="День народження Google" />
+          </div>
+          <div>
+            <label>Команда/Клас</label>
+            <input id="team" type="text" placeholder="напр., 1-А / Team Blue" />
+          </div>
+        </div>
+        <div class="row" style="margin-top: 8px">
+          <div>
+            <label>Ім’я та прізвище</label>
+            <input id="participant" type="text" placeholder="Ім’я Прізвище" />
+          </div>
+          <div style="display: flex; align-items: end; gap: 8px">
+            <button id="startBtn">Почати</button>
+            <button class="secondary" id="aliveBtn" type="button">
+              Перевірити підключення
+            </button>
+          </div>
+        </div>
+        <div class="hint">
+          * Результат збережеться в таблицю після натискання «Надіслати».
+        </div>
+        <div class="hint" id="aliveMsg"></div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div id="grid" class="grid" aria-label="Кросворд"></div>
+
+      <div class="panel">
+        <div class="card" id="actionsCard">
+          <h3>Керування</h3>
+          <div class="row">
+            <div style="display: flex; align-items: end; gap: 8px">
+              <button id="checkBtn" disabled>Перевірити</button>
+              <button id="submitBtn" disabled>Надіслати</button>
+            </div>
+            <div>
+              <div class="hint">
+                Результат: <span id="score" class="score">0 / 0</span>
+              </div>
+              <div class="hint">
+                Час: <span id="elapsed" class="score">0 с</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="acrossCard" style="display: none">
+          <h3>Підказки — по горизонталі</h3>
+          <div id="clues-across" class="clues"></div>
+        </div>
+        <div class="card" id="downCard" style="display: none">
+          <h3>Підказки — по вертикалі</h3>
+          <div id="clues-down" class="clues"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /** URL твого Web App (Apps Script) */
+      const WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbwJ7yDt2-NKqeK0gnoeaFl1-Q_HIO-CiE6DZTSv7XwdE64EV1Yes8ZKcfsYdpZq-R_g6Q/exec";
+      /** Визначення пазла (12×12) */
+      const PUZZLE = {
+        size: 12,
+        entries: [
+          // Across
+          {
+            num: 1,
+            dir: "across",
+            row: 3,
+            col: 1,
+            answer: "ХРОМ",
+            clue: "Популярний браузер від Google.",
+          },
+          {
+            num: 2,
+            dir: "across",
+            row: 6,
+            col: 2,
+            answer: "ЛАРРІПЕЙДЖ",
+            clue: "Один із співзасновників Google.",
+          },
+          {
+            num: 3,
+            dir: "across",
+            row: 8,
+            col: 2,
+            answer: "ЮТУБ",
+            clue: "Відеоплатформа, що належить Google.",
+          },
+          {
+            num: 4,
+            dir: "across",
+            row: 2,
+            col: 9,
+            answer: "ДУДЛ",
+            clue: "Святковий малюнок на головній сторінці Google.",
+          },
+          {
+            num: 5,
+            dir: "across",
+            row: 10,
+            col: 2,
+            answer: "КЛАУД",
+            clue: "Хмарні сервіси від Google.",
+          },
+          {
+            num: 6,
+            dir: "across",
+            row: 12,
+            col: 3,
+            answer: "АНДРОЇД",
+            clue: "ОС для смартфонів від Google.",
+          },
+          // Down
+          {
+            num: 7,
+            dir: "down",
+            row: 1,
+            col: 6,
+            answer: "ПЕЙДЖРАНК",
+            clue: "Алгоритм ранжування сторінок.",
+          },
+          {
+            num: 8,
+            dir: "down",
+            row: 2,
+            col: 5,
+            answer: "СЕРГІЙБРІН",
+            clue: "Співзасновник Google.",
+          },
+          {
+            num: 9,
+            dir: "down",
+            row: 2,
+            col: 9,
+            answer: "ДІПМАЙНД",
+            clue: "Лабораторія ШІ, що належить Google.",
+          },
+        ],
+      };
+
+      // ==== Побудова сітки ====
+      const gridEl = document.getElementById("grid");
+      const size = PUZZLE.size;
+      document.documentElement.style.setProperty("--grid-size", size);
+
+      const grid = Array.from({ length: size }, () =>
+        Array.from({ length: size }, () => ({ letter: null, num: null }))
+      );
+
+      for (const ent of PUZZLE.entries) {
+        const r0 = ent.row - 1;
+        const c0 = ent.col - 1;
+        const letters = ent.answer.toUpperCase();
+        for (let i = 0; i < letters.length; i++) {
+          const rr = r0 + (ent.dir === "down" ? i : 0);
+          const cc = c0 + (ent.dir === "across" ? i : 0);
+          const cell = grid[rr][cc];
+          cell.letter = letters[i];
+        }
+        if (!grid[r0][c0].num) grid[r0][c0].num = ent.num;
+      }
+
+      // Рендер клітинок
+      const inputsByPos = new Map(); // "r,c" -> input
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const cell = grid[r][c];
+          const div = document.createElement("div");
+          div.className = "cell" + (cell.letter ? "" : " block");
+
+          if (cell.num) {
+            const nm = document.createElement("div");
+            nm.className = "num";
+            nm.textContent = cell.num;
+            div.appendChild(nm);
+          }
+
+          if (cell.letter) {
+            const inp = document.createElement("input");
+            inp.maxLength = 1;
+            inp.autocomplete = "off";
+            inp.inputMode = "text";
+            inp.disabled = true; // поки не старт
+            inp.dataset.r = r;
+            inp.dataset.c = c;
+            inp.addEventListener("input", (e) => {
+              e.target.value = e.target.value
+                .toLocaleUpperCase("uk-UA")
+                .slice(0, 1);
+              const nc = c + 1;
+              const next = inputsByPos.get(`${r},${nc}`);
+              if (e.target.value && next) next.focus();
+            });
+            inp.addEventListener("keydown", (e) => {
+              const r = +e.target.dataset.r;
+              const c = +e.target.dataset.c;
+              if (e.key === "ArrowRight")
+                inputsByPos.get(`${r},${c + 1}`)?.focus();
+              else if (e.key === "ArrowLeft")
+                inputsByPos.get(`${r},${c - 1}`)?.focus();
+              else if (e.key === "ArrowDown")
+                inputsByPos.get(`${r + 1},${c}`)?.focus();
+              else if (e.key === "ArrowUp")
+                inputsByPos.get(`${r - 1},${c}`)?.focus();
+              else if (e.key === "Backspace" && !e.target.value)
+                inputsByPos.get(`${r},${c - 1}`)?.focus();
+            });
+            div.appendChild(inp);
+            inputsByPos.set(`${r},${c}`, inp);
+          }
+          gridEl.appendChild(div);
+        }
+      }
+
+      // Підказки
+      const cluesAcross = document.getElementById("clues-across");
+      const cluesDown = document.getElementById("clues-down");
+      for (const ent of PUZZLE.entries.filter((e) => e.dir === "across")) {
+        const p = document.createElement("div");
+        p.innerHTML = `<b>${ent.num}.</b> ${ent.clue}`;
+        cluesAcross.appendChild(p);
+      }
+      for (const ent of PUZZLE.entries.filter((e) => e.dir === "down")) {
+        const p = document.createElement("div");
+        p.innerHTML = `<b>${ent.num}.</b> ${ent.clue}`;
+        cluesDown.appendChild(p);
+      }
+      // ховаємо підказки до старту
+      document.getElementById("acrossCard").style.display = "none";
+      document.getElementById("downCard").style.display = "none";
+
+      function setInputsEnabled(on) {
+        inputsByPos.forEach((inp) => (inp.disabled = !on));
+        document.getElementById("checkBtn").disabled = !on;
+        document.getElementById("submitBtn").disabled = !on;
+      }
+
+      // Таймер
+      let startedAt = null;
+      let tickTimer = null;
+      function startTimer() {
+        startedAt = Date.now();
+        tickTimer = setInterval(() => {
+          const sec = Math.floor((Date.now() - startedAt) / 1000);
+          document.getElementById("elapsed").textContent = `${sec} с`;
+          document.getElementById("timer").textContent = toMMSS(sec);
+        }, 250);
+      }
+      function stopTimer() {
+        if (tickTimer) clearInterval(tickTimer);
+      }
+      function toMMSS(s) {
+        const mm = String(Math.floor(s / 60)).padStart(2, "0");
+        const ss = String(s % 60).padStart(2, "0");
+        return `${mm}:${ss}`;
+      }
+
+      // Перевірка
+      function check() {
+        let correct = 0,
+          total = 0;
+        inputsByPos.forEach((inp, key) => {
+          const [r, c] = key.split(",").map(Number);
+          const cell = grid[r][c];
+          if (!cell.letter) return;
+          total++;
+          const good = (inp.value || "").toUpperCase() === cell.letter;
+          inp.style.background = good
+            ? "var(--ok)"
+            : inp.value
+            ? "var(--bad)"
+            : "";
+          if (good) correct++;
+        });
+        document.getElementById("score").textContent = `${correct} / ${total}`;
+        return { correct, total };
+      }
+
+      function collectAnswers() {
+        const answers = {};
+        for (const ent of PUZZLE.entries) {
+          const letters = [];
+          for (let i = 0; i < ent.answer.length; i++) {
+            const r = ent.row - 1 + (ent.dir === "down" ? i : 0);
+            const c = ent.col - 1 + (ent.dir === "across" ? i : 0);
+            letters.push(
+              (inputsByPos.get(`${r},${c}`)?.value || " ").toUpperCase()
+            );
+          }
+          answers[`${ent.num}-${ent.dir}`] = {
+            clue: ent.clue,
+            expected: ent.answer.toUpperCase(),
+            typed: letters.join("").trimEnd(),
+          };
+        }
+        return answers;
+      }
+
+      // Кнопки
+      document.getElementById("checkBtn").addEventListener("click", check);
+
+      document.getElementById("startBtn").addEventListener("click", () => {
+        // показуємо підказки і вмикаємо інпути
+        document.getElementById("acrossCard").style.display = "";
+        document.getElementById("downCard").style.display = "";
+        setInputsEnabled(true);
+        document.getElementById("overlay").style.display = "none";
+        startTimer();
+        // фокус у першу клітинку
+        inputsByPos.get("0,0")?.focus();
+      });
+
+      document
+        .getElementById("aliveBtn")
+        .addEventListener("click", async () => {
+          const el = document.getElementById("aliveMsg");
+          el.textContent = "Перевіряю...";
+          try {
+            const res = await fetch(WEB_APP_URL);
+            const j = await res.json();
+            el.textContent = j?.ok
+              ? "Підключення OK"
+              : "Сервер відповів, але без OK";
+          } catch (e) {
+            el.textContent = "Не вдалося підключитись: " + e.message;
+          }
+        });
+
+      document
+        .getElementById("submitBtn")
+        .addEventListener("click", async () => {
+          const score = check();
+          const durationSec = startedAt
+            ? Math.floor((Date.now() - startedAt) / 1000)
+            : null;
+
+          const payload = {
+            event: document.getElementById("event").value.trim(),
+            team: document.getElementById("team").value.trim(),
+            participant: document.getElementById("participant").value.trim(),
+            answers: collectAnswers(),
+            score,
+            durationSec,
+            userAgent: navigator.userAgent,
+          };
+
+          if (!WEB_APP_URL || WEB_APP_URL.includes("PASTE_YOUR")) {
+            alert("Встав WEB_APP_URL (Apps Script) у верхівці файлу!");
+            return;
+          }
+          try {
+            const res = await fetch(WEB_APP_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" }, // без preflight
+              body: JSON.stringify(payload),
+            });
+            const ok =
+              res.ok &&
+              (
+                await res
+                  .clone()
+                  .json()
+                  .catch(() => ({ ok: true }))
+              ).ok !== false;
+            if (!ok) {
+              alert("Помилка збереження.");
+              return;
+            }
+
+            // Запитати найкращий результат для цієї події
+            const url = new URL(WEB_APP_URL);
+            url.searchParams.set("action", "best");
+            url.searchParams.set("event", payload.event);
+            const bestResp = await fetch(url.toString(), { method: "GET" });
+            const best = (await bestResp.json()).best;
+
+            let msg = "";
+            if (!best) {
+              msg =
+                "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу.";
+            } else {
+              const myBetter =
+                score.correct > best.correct ||
+                (score.correct === best.correct &&
+                  durationSec < best.durationSec);
+
+              if (myBetter) {
+                msg =
+                  "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу.";
+              } else {
+                msg =
+                  "На жаль, вже є учасник, який показав кращий результат (більше правильних або швидше).";
+              }
+            }
+            stopTimer();
+            alert(
+              `${msg}\nВаш час: ${toMMSS(durationSec)}  |  Бал: ${
+                score.correct
+              }/${score.total}`
+            );
+          } catch (e) {
+            alert("Помилка відправлення: " + e.message);
+          }
+        });
+    </script>
+  </body>
+</html>
