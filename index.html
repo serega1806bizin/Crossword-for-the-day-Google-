@@ -117,8 +117,8 @@
         width: 26px;
       }
       .row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
       }
       .row label {
@@ -146,6 +146,10 @@
       button.secondary {
         background: #f9f9f9;
         color: #111;
+      }
+      button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
       .hint {
         font-size: 12px;
@@ -186,11 +190,71 @@
         gap: 8px;
         margin-top: 12px;
       }
+
+      /* Результат-модал (тот же стиль, просто отдельный контейнер) */
+      #resultOverlay {
+        display: none;
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%) translateY(20px);
+        background: #111;
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s, opacity 0.25s;
+        z-index: 20;
+        max-width: min(92vw, 560px);
+        text-align: center;
+        font-weight: 600;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      .toast.success {
+        background: #1a7f37;
+      }
+      .toast.danger {
+        background: #b42318;
+      }
+      .toast.info {
+        background: #111;
+      }
+      /* тонкая сетка ячеек */
+      .cell {
+        border: 1px solid #d9dee5;
+      }
+
+      /* утолщаем границу там, где слово начинается/заканчивается */
+      .cell.sep-top {
+        border-top-width: 3px;
+        border-top-color: #111;
+      }
+      .cell.sep-left {
+        border-left-width: 3px;
+        border-left-color: #111;
+      }
+      /* опционально — внешняя рамка сетки */
+      .cell.first-row {
+        border-top-width: 3px;
+        border-top-color: #111;
+      }
+      .cell.first-col {
+        border-left-width: 3px;
+        border-left-color: #111;
+      }
     </style>
   </head>
   <body>
     <h1>
-      Кросворд до події «День народження Google»
       <span class="muted" id="timer">00:00</span>
     </h1>
 
@@ -199,34 +263,44 @@
       <div class="modal">
         <h2>Готові почати?</h2>
         <p>Коли натиснете <b>Почати</b>, з’являться підказки й піде таймер.</p>
+        <p>Перемога за тим, хто завершить завдання найшвидше. </p>
+
         <div class="row" style="margin-top: 8px">
           <div>
             <label>Назва події</label>
-            <input id="event" type="text" value="День народження Google" />
+            <input id="event" type="text" disabled value="День народження Google" />
           </div>
           <div>
-            <label>Команда/Клас</label>
-            <input id="team" type="text" placeholder="напр., 1-А / Team Blue" />
+            <label>Група</label>
+            <input id="team" type="text" placeholder="наприклад, ПЗ-221/222" />
           </div>
         </div>
         <div class="row" style="margin-top: 8px">
           <div>
             <label>Ім’я та прізвище</label>
-            <input id="participant" type="text" placeholder="Ім’я Прізвище" />
+            <input id="participant" type="text" placeholder="Владлен Мелсон" />
           </div>
           <div style="display: flex; align-items: end; gap: 8px">
             <button id="startBtn">Почати</button>
-            <button class="secondary" id="aliveBtn" type="button">
-              Перевірити підключення
-            </button>
           </div>
-        </div>
-        <div class="hint">
-          * Результат збережеться в таблицю після натискання «Надіслати».
         </div>
         <div class="hint" id="aliveMsg"></div>
       </div>
     </div>
+
+    <!-- Модал результата -->
+    <div class="overlay" id="resultOverlay">
+      <div class="modal">
+        <h2 id="resultTitle">Результат</h2>
+        <p id="resultText"></p>
+        <div class="actions">
+          <button id="closeResult">Ок</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
 
     <div class="wrap">
       <div id="grid" class="grid" aria-label="Кросворд"></div>
@@ -264,95 +338,167 @@
     <script>
       /** URL твого Web App (Apps Script) */
       const WEB_APP_URL =
-        "https://script.google.com/macros/s/AKfycbwJ7yDt2-NKqeK0gnoeaFl1-Q_HIO-CiE6DZTSv7XwdE64EV1Yes8ZKcfsYdpZq-R_g6Q/exec";
+        "https://script.google.com/macros/s/AKfycbwKhLZxcfvpr-vVQt-0spelgA0JnvM18gS-tx1bPNjfKesWPpy8awxZs8qr2KiXN8Mc1A/exec";
+
       /** Визначення пазла (12×12) */
       const PUZZLE = {
-        size: 12,
+        size: 15,
         entries: [
-          // Across
           {
             num: 1,
             dir: "across",
-            row: 3,
-            col: 1,
-            answer: "ХРОМ",
-            clue: "Популярний браузер від Google.",
-          },
-          {
-            num: 2,
-            dir: "across",
-            row: 6,
-            col: 2,
-            answer: "ЛАРРІПЕЙДЖ",
-            clue: "Один із співзасновників Google.",
-          },
-          {
-            num: 3,
-            dir: "across",
-            row: 8,
-            col: 2,
+            row: 2,
+            col: 3,
             answer: "ЮТУБ",
             clue: "Відеоплатформа, що належить Google.",
           },
           {
-            num: 4,
+            num: 3,
             dir: "across",
-            row: 2,
-            col: 9,
-            answer: "ДУДЛ",
-            clue: "Святковий малюнок на головній сторінці Google.",
-          },
-          {
-            num: 5,
-            dir: "across",
-            row: 10,
+            row: 4,
             col: 2,
-            answer: "КЛАУД",
-            clue: "Хмарні сервіси від Google.",
-          },
-          {
-            num: 6,
-            dir: "across",
-            row: 12,
-            col: 3,
-            answer: "АНДРОЇД",
-            clue: "ОС для смартфонів від Google.",
-          },
-          // Down
-          {
-            num: 7,
-            dir: "down",
-            row: 1,
-            col: 6,
             answer: "ПЕЙДЖРАНК",
             clue: "Алгоритм ранжування сторінок.",
           },
           {
             num: 8,
-            dir: "down",
-            row: 2,
-            col: 5,
-            answer: "СЕРГІЙБРІН",
-            clue: "Співзасновник Google.",
+            dir: "across",
+            row: 6,
+            col: 4,
+            answer: "БРІН",
+            clue: "Прізвище співзасновника Google.",
+          },
+          {
+            num: 5,
+            dir: "across",
+            row: 7,
+            col: 9,
+            answer: "ГУГОЛ",
+            clue: "Число яке використав Google для своєї назви.",
+          },
+          {
+            num: 10,
+            dir: "across",
+            row: 8,
+            col: 4,
+            answer: "ХРОМ",
+            clue: "Популярний браузер від Google.",
+          },
+          {
+            num: 7,
+            dir: "across",
+            row: 9,
+            col: 12,
+            answer: "ДУДЛ",
+            clue: "Святковий малюнок на головній сторінці Google.",
           },
           {
             num: 9,
-            dir: "down",
-            row: 2,
-            col: 9,
+            dir: "across",
+            row: 10,
+            col: 2,
+            answer: "ПЕЙДЖ",
+            clue: "Один із співзасновників Google.",
+          },
+          {
+            num: 11,
+            dir: "across",
+            row: 12,
+            col: 1,
             answer: "ДІПМАЙНД",
             clue: "Лабораторія ШІ, що належить Google.",
+          },
+
+          // ——— Down (вертикаль) ———
+          // стоим так, чтобы пересечения с (2) шли по совпадающим буквам
+          {
+            num: 2,
+            dir: "down",
+            row: 1,
+            col: 5,
+            answer: "СУНДАРАРАДЖАН",
+            clue: "Імя головного директора Google.",
+          }, // пересекает (2) по букве «Р» в колонке 5
+          {
+            num: 4,
+            dir: "down",
+            row: 4,
+            col: 10,
+            answer: "КЛАУД",
+            clue: "Хмарні сервіси від Google.",
+          }, // пересекает (2) по «І» в колонке 6
+          {
+            num: 6,
+            dir: "down",
+            row: 3,
+            col: 12,
+            answer: "АНДРОЇД",
+            clue: "ОС для смартфонів від Google.",
+          },
+          {
+            num: 12,
+            dir: "down",
+            row: 2,
+            col: 8,
+            answer: "США",
+            clue: "Країна заснування Google.",
           },
         ],
       };
 
-      // ==== Побудова сітки ====
+      // ---------- маленькие UI-утилиты ----------
+      let toastTimer;
+      function showToast(text, type = "info") {
+        const t = document.getElementById("toast");
+        t.className = "toast " + type;
+        t.textContent = text;
+        // показываем
+        void t.offsetWidth; // reflow
+        t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+      }
+
+      function showResultModal(title, html) {
+        document.getElementById("resultTitle").textContent = title;
+        const box = document.getElementById("resultText");
+        box.innerHTML = html;
+        document.getElementById("resultOverlay").style.display = "flex";
+      }
+      document.getElementById("closeResult").addEventListener("click", () => {
+        document.getElementById("resultOverlay").style.display = "none";
+      });
+
+      function setInputsEnabled(on) {
+        inputsByPos.forEach((inp) => (inp.disabled = !on));
+        document.getElementById("checkBtn").disabled = !on;
+        document.getElementById("submitBtn").disabled = !on;
+      }
+
+      const submitBtn = document.getElementById("submitBtn");
+      function setSubmitting(on) {
+        if (on) {
+          submitBtn.dataset.label = submitBtn.textContent;
+          submitBtn.textContent = "Надсилання…";
+          submitBtn.disabled = true;
+        } else {
+          submitBtn.textContent = submitBtn.dataset.label || "Надіслати";
+          submitBtn.disabled = false;
+        }
+      }
+
+      // ---------- построение сетки ----------
       const gridEl = document.getElementById("grid");
       const size = PUZZLE.size;
       document.documentElement.style.setProperty("--grid-size", size);
 
       const grid = Array.from({ length: size }, () =>
-        Array.from({ length: size }, () => ({ letter: null, num: null }))
+        Array.from({ length: size }, () => ({
+          letter: null,
+          num: null,
+          across: null,
+          down: null,
+        }))
       );
 
       for (const ent of PUZZLE.entries) {
@@ -364,17 +510,35 @@
           const cc = c0 + (ent.dir === "across" ? i : 0);
           const cell = grid[rr][cc];
           cell.letter = letters[i];
+          if (ent.dir === "across") cell.across = ent.num;
+          else cell.down = ent.num;
         }
         if (!grid[r0][c0].num) grid[r0][c0].num = ent.num;
       }
 
-      // Рендер клітинок
-      const inputsByPos = new Map(); // "r,c" -> input
+      // рендер клеток
+      const inputsByPos = new Map();
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
           const cell = grid[r][c];
           const div = document.createElement("div");
           div.className = "cell" + (cell.letter ? "" : " block");
+
+          if (cell.letter) {
+            // граница сверху — нет буквы или это уже другое вертикальное слово
+            const up = r > 0 ? grid[r - 1][c] : null;
+            if (!up || !up.letter || up.down !== cell.down)
+              div.classList.add("sep-top");
+
+            // граница слева — нет буквы или это уже другое горизонтальное слово
+            const left = c > 0 ? grid[r][c - 1] : null;
+            if (!left || !left.letter || left.across !== cell.across)
+              div.classList.add("sep-left");
+
+            // внешние рамки
+            if (r === 0) div.classList.add("first-row");
+            if (c === 0) div.classList.add("first-col");
+          }
 
           if (cell.num) {
             const nm = document.createElement("div");
@@ -388,20 +552,19 @@
             inp.maxLength = 1;
             inp.autocomplete = "off";
             inp.inputMode = "text";
-            inp.disabled = true; // поки не старт
+            inp.disabled = true;
             inp.dataset.r = r;
             inp.dataset.c = c;
             inp.addEventListener("input", (e) => {
               e.target.value = e.target.value
                 .toLocaleUpperCase("uk-UA")
                 .slice(0, 1);
-              const nc = c + 1;
-              const next = inputsByPos.get(`${r},${nc}`);
+              const next = inputsByPos.get(`${r},${c + 1}`);
               if (e.target.value && next) next.focus();
             });
             inp.addEventListener("keydown", (e) => {
-              const r = +e.target.dataset.r;
-              const c = +e.target.dataset.c;
+              const r = +e.target.dataset.r,
+                c = +e.target.dataset.c;
               if (e.key === "ArrowRight")
                 inputsByPos.get(`${r},${c + 1}`)?.focus();
               else if (e.key === "ArrowLeft")
@@ -420,7 +583,7 @@
         }
       }
 
-      // Підказки
+      // подсказки
       const cluesAcross = document.getElementById("clues-across");
       const cluesDown = document.getElementById("clues-down");
       for (const ent of PUZZLE.entries.filter((e) => e.dir === "across")) {
@@ -433,19 +596,12 @@
         p.innerHTML = `<b>${ent.num}.</b> ${ent.clue}`;
         cluesDown.appendChild(p);
       }
-      // ховаємо підказки до старту
       document.getElementById("acrossCard").style.display = "none";
       document.getElementById("downCard").style.display = "none";
 
-      function setInputsEnabled(on) {
-        inputsByPos.forEach((inp) => (inp.disabled = !on));
-        document.getElementById("checkBtn").disabled = !on;
-        document.getElementById("submitBtn").disabled = !on;
-      }
-
-      // Таймер
-      let startedAt = null;
-      let tickTimer = null;
+      // таймер
+      let startedAt = null,
+        tickTimer = null;
       function startTimer() {
         startedAt = Date.now();
         tickTimer = setInterval(() => {
@@ -463,7 +619,7 @@
         return `${mm}:${ss}`;
       }
 
-      // Перевірка
+      // проверка
       function check() {
         let correct = 0,
           total = 0;
@@ -483,7 +639,6 @@
         document.getElementById("score").textContent = `${correct} / ${total}`;
         return { correct, total };
       }
-
       function collectAnswers() {
         const answers = {};
         for (const ent of PUZZLE.entries) {
@@ -504,17 +659,18 @@
         return answers;
       }
 
-      // Кнопки
-      document.getElementById("checkBtn").addEventListener("click", check);
+      // кнопки
+      document.getElementById("checkBtn").addEventListener("click", () => {
+        const s = check();
+        showToast(`Перевірено: ${s.correct}/${s.total}`, "info");
+      });
 
       document.getElementById("startBtn").addEventListener("click", () => {
-        // показуємо підказки і вмикаємо інпути
         document.getElementById("acrossCard").style.display = "";
         document.getElementById("downCard").style.display = "";
         setInputsEnabled(true);
         document.getElementById("overlay").style.display = "none";
         startTimer();
-        // фокус у першу клітинку
         inputsByPos.get("0,0")?.focus();
       });
 
@@ -526,11 +682,18 @@
           try {
             const res = await fetch(WEB_APP_URL);
             const j = await res.json();
-            el.textContent = j?.ok
+            const ok = !!j?.ok;
+            el.textContent = ok
               ? "Підключення OK"
               : "Сервер відповів, але без OK";
+            showToast(
+              ok ? "Підключення OK" : "Сервер без OK",
+              ok ? "success" : "danger"
+            );
           } catch (e) {
             el.textContent = "Не вдалося підключитись: " + e.message;
+            console.error(e);
+            showToast("Не вдалося підключитись", "danger");
           }
         });
 
@@ -553,13 +716,15 @@
           };
 
           if (!WEB_APP_URL || WEB_APP_URL.includes("PASTE_YOUR")) {
-            alert("Встав WEB_APP_URL (Apps Script) у верхівці файлу!");
+            showToast("Встав WEB_APP_URL у коді", "danger");
             return;
           }
+
           try {
+            setSubmitting(true);
             const res = await fetch(WEB_APP_URL, {
               method: "POST",
-              headers: { "Content-Type": "text/plain;charset=utf-8" }, // без preflight
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
               body: JSON.stringify(payload),
             });
             const ok =
@@ -571,43 +736,44 @@
                   .catch(() => ({ ok: true }))
               ).ok !== false;
             if (!ok) {
-              alert("Помилка збереження.");
+              showToast("Помилка збереження", "danger");
+              setSubmitting(false);
               return;
             }
 
-            // Запитати найкращий результат для цієї події
+            // Запитати найкращий результат
             const url = new URL(WEB_APP_URL);
             url.searchParams.set("action", "best");
             url.searchParams.set("event", payload.event);
             const bestResp = await fetch(url.toString(), { method: "GET" });
             const best = (await bestResp.json()).best;
 
-            let msg = "";
+            let html;
             if (!best) {
-              msg =
-                "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу.";
+              html = `Вітаю! На даний момент ви найкращі!<br>Очікуйте завершення конкурсу.<br><br><b>Ваш час:</b> ${toMMSS(
+                durationSec
+              )}<br><b>Бал:</b> ${score.correct}/${score.total}`;
             } else {
               const myBetter =
                 score.correct > best.correct ||
                 (score.correct === best.correct &&
                   durationSec < best.durationSec);
-
-              if (myBetter) {
-                msg =
-                  "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу.";
-              } else {
-                msg =
-                  "На жаль, вже є учасник, який показав кращий результат (більше правильних або швидше).";
-              }
+              html =
+                (myBetter
+                  ? "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу."
+                  : "На жаль, вже є учасник, який показав кращий результат (більше правильних або швидше).") +
+                `<br><br><b>Ваш час:</b> ${toMMSS(durationSec)} | <b>Бал:</b> ${
+                  score.correct
+                }/${score.total}`;
             }
             stopTimer();
-            alert(
-              `${msg}\nВаш час: ${toMMSS(durationSec)}  |  Бал: ${
-                score.correct
-              }/${score.total}`
-            );
+            showResultModal("Результат", html);
+            showToast("Відправлено в таблицю", "success");
           } catch (e) {
-            alert("Помилка відправлення: " + e.message);
+            console.error(e);
+            showToast("Помилка відправлення: " + e.message, "danger");
+          } finally {
+            setSubmitting(false);
           }
         });
     </script>
