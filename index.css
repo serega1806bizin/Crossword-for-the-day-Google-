@@ -1,0 +1,251 @@
+      :root {
+        --grid-size: 12;
+        --cell: 38px;
+        --gap: 3px;
+        --ok: #c6f6c6;
+        --bad: #ffd7d7;
+        --num: #666;
+        --block: #111;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 16px;
+        background: #fafafa;
+      }
+      h1 {
+        margin: 0 0 12px;
+      }
+
+      .wrap {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 980px) {
+        .wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 480px) {
+        :root {
+          --cell: 30px;
+        }
+        body {
+          margin: 10px;
+        }
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(var(--grid-size), var(--cell));
+        grid-auto-rows: var(--cell);
+        gap: var(--gap);
+        background: #eee;
+        padding: var(--gap);
+        border-radius: 10px;
+        position: relative;
+      }
+      .cell {
+        position: relative;
+        width: var(--cell);
+        height: var(--cell);
+        background: #fff;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+      }
+      .cell.block {
+        background: var(--block);
+      }
+      .num {
+        position: absolute;
+        left: 4px;
+        top: 2px;
+        font-size: 11px;
+        color: var(--num);
+        user-select: none;
+      }
+      .cell input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        text-transform: uppercase;
+        text-align: center;
+        font-weight: 700;
+        font-size: 18px;
+        background: transparent;
+      }
+      @media (max-width: 480px) {
+        .cell input {
+          font-size: 16px;
+        }
+      }
+
+      .panel {
+        display: grid;
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 12px;
+        background: #fff;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+      }
+      .clues {
+        display: grid;
+        gap: 8px;
+        max-height: 50vh;
+        overflow: auto;
+      }
+      .clues b {
+        display: inline-block;
+        width: 26px;
+      }
+      .row {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .row label {
+        font-size: 12px;
+        color: #555;
+        display: block;
+        margin-bottom: 4px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background: #fff;
+      }
+      button {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid #222;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      button.secondary {
+        background: #f9f9f9;
+        color: #111;
+      }
+      button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .hint {
+        font-size: 12px;
+        color: #666;
+      }
+      .score {
+        font-weight: 700;
+      }
+      .muted {
+        color: #777;
+      }
+
+      /* Стартовий модал */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000; /* чуть выше */
+      }
+
+      .modal {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        max-height: 90vh; /* чтобы не вылазило за экран */
+        overflow-y: auto; /* скролл если слишком много текста */
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+
+        /* главное: центр по viewport */
+      }
+
+      .modal h2 {
+        margin: 0 0 8px;
+      }
+      .modal p {
+        margin: 6px 0;
+      }
+      .modal .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      /* Результат-модал (тот же стиль, просто отдельный контейнер) */
+      #resultOverlay {
+        display: none;
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%) translateY(20px);
+        background: #111;
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s, opacity 0.25s;
+        z-index: 20;
+        max-width: min(92vw, 560px);
+        text-align: center;
+        font-weight: 600;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      .toast.success {
+        background: #1a7f37;
+      }
+      .toast.danger {
+        background: #b42318;
+      }
+      .toast.info {
+        background: #111;
+      }
+      /* тонкая сетка ячеек */
+      .cell {
+        border: 1px solid #d9dee5;
+      }
+
+      /* утолщаем границу там, где слово начинается/заканчивается */
+      .cell.sep-top {
+        border-top-width: 3px;
+        border-top-color: #111;
+      }
+      .cell.sep-left {
+        border-left-width: 3px;
+        border-left-color: #111;
+      }
+      /* опционально — внешняя рамка сетки */
+      .cell.first-row {
+        border-top-width: 3px;
+        border-top-color: #111;
+      }
+      .cell.first-col {
+        border-left-width: 3px;
+        border-left-color: #111;
+      }
