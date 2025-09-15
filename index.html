@@ -1,104 +1,330 @@
 <!DOCTYPE html>
 <html lang="uk">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Кросворд — День народження Google</title>
-    <link rel="stylesheet" href="index.css" />
-  </head>
-  <body>
-    <h1>
-      <span class="muted" id="timer">00:00</span>
-    </h1>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Дякую — конкурс уже завершений</title>
+  <meta name="theme-color" content="#0b1020" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      /* === Палитра === */
+      --bg-1:#0b1020; /* фон */
+      --bg-2:#0b0f2a; /* фон */
+      --c-1:#7c3aed;  /* фіолетовий */
+      --c-2:#22d3ee;  /* бірюзовий */
+      --c-3:#f59e0b;  /* янтар */
+      --c-4:#ef4444;  /* корал */
+      --glass-bg: 20,20,35; /* rgb без альфи для скляного блоку */
+      --text:#e6ebff;
+      --muted:#b6c0ff;
+      --shadow:0 20px 60px rgba(11,16,32,.55), 0 2px 8px rgba(0,0,0,.4);
+    }
 
-    <div class="overlay" id="overlay">
-      <div class="modal">
-        <h2>Готові почати?</h2>
-        <p>Коли натиснете <b>Почати</b>, з’являться підказки й піде таймер.</p>
-        <p>Перемога за тим, хто завершить завдання найшвидше.</p>
+    /* Базові стилі */
+    * { box-sizing:border-box }
+    html,body { height:100%; }
+    body{
+      margin:0;
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 15% 10%, #13204a 0%, transparent 60%),
+                  radial-gradient(1000px 700px at 85% 30%, #211241 0%, transparent 60%),
+                  linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+      font-family:"Montserrat", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow:hidden; /* ми керуємо скролом самі */
+    }
 
-        <div class="row" style="margin-top: 8px">
-          <div>
-            <label>Назва події</label>
-            <input
-              id="event"
-              type="text"
-              disabled
-              value="День народження Google"
-            />
-          </div>
-          <div>
-            <label>Група</label>
-            <input
-              required
-              id="team"
-              type="text"
-              placeholder="наприклад, ПЗ-221/222"
-            />
-          </div>
-        </div>
-        <div class="row" style="margin-top: 8px">
-          <div>
-            <label>Ім’я та прізвище</label>
-            <input
-              required
-              id="participant"
-              type="text"
-              placeholder="Владлен Мелсон"
-            />
-          </div>
-          <div style="display: flex; align-items: end; gap: 8px">
-            <button id="startBtn">Почати</button>
-          </div>
-        </div>
-        <div class="hint" id="aliveMsg"></div>
-      </div>
-    </div>
+    /* Плавний вхід */
+    body{ opacity:0; animation:fadeIn .8s ease forwards; }
+    @keyframes fadeIn { to { opacity:1 } }
 
-    <div class="overlay" id="resultOverlay">
-      <div class="modal">
-        <h2 id="resultTitle">Результат</h2>
-        <p id="resultText"></p>
-        <div class="actions">
-          <button id="closeResult">Ок</button>
-        </div>
-      </div>
-    </div>
+    /* Анімований градієнт фону */
+    body::before{
+      content:"";
+      position:fixed; inset:-20vh -20vw;
+      background:
+        radial-gradient(60vmax 40vmax at 10% 90%, rgba(124,58,237,.35), transparent 60%),
+        radial-gradient(70vmax 50vmax at 90% 10%, rgba(34,211,238,.35), transparent 60%),
+        conic-gradient(from 0deg, rgba(255,255,255,.07), rgba(255,255,255,0) 70%);
+      filter: blur(40px) saturate(120%);
+      animation: drift 24s ease-in-out infinite alternate;
+      pointer-events:none;
+      z-index:-2;
+    }
+    @keyframes drift { to { transform: translate3d(2vw, -3vh, 0) rotate(3deg) scale(1.02); } }
 
-    <div id="toast" class="toast"></div>
+    /* Блиміння зірок */
+    .stars{ position:fixed; inset:0; pointer-events:none; z-index:-1; }
+    .stars::before, .stars::after{
+      content:""; position:absolute; inset:0;
+      background-image: radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.7) 50%, transparent 51%),
+                        radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,.6) 50%, transparent 51%),
+                        radial-gradient(1.5px 1.5px at 80% 40%, rgba(255,255,255,.5) 50%, transparent 51%),
+                        radial-gradient(1px 1px at 30% 80%, rgba(255,255,255,.4) 50%, transparent 51%),
+                        radial-gradient(1.5px 1.5px at 40% 50%, rgba(255,255,255,.45) 50%, transparent 51%);
+      animation: twinkle 8s linear infinite;
+      opacity:.5;
+    }
+    .stars::after{ filter: blur(1px); animation-duration:12s; opacity:.25 }
+    @keyframes twinkle { to { transform: translateY(-2vh) } }
 
-    <div class="wrap">
-      <div id="grid" class="grid" aria-label="Кросворд"></div>
+    /* Плаваючі "блоби" */
+    .blob{ position:fixed; width:40vmax; height:40vmax; border-radius:50%; filter: blur(60px); opacity:.35; mix-blend-mode:screen; pointer-events:none; }
+    .b1{ left:-10vmax; bottom:-6vmax; background: radial-gradient(circle at 30% 30%, var(--c-1), transparent 60%); animation: float1 26s ease-in-out infinite; }
+    .b2{ right:-8vmax; top:-8vmax; background: radial-gradient(circle at 70% 70%, var(--c-2), transparent 60%); animation: float2 28s ease-in-out infinite; }
+    .b3{ right:10vmax; bottom:-12vmax; background: radial-gradient(circle at 50% 50%, var(--c-3), transparent 60%); animation: float3 22s ease-in-out infinite; }
+    @keyframes float1 { 50%{ transform: translate(6vmax,-2vmax) scale(1.05)} }
+    @keyframes float2 { 50%{ transform: translate(-5vmax,3vmax) scale(1.08)} }
+    @keyframes float3 { 50%{ transform: translate(-3vmax,-2vmax) scale(1.04)} }
 
-      <div class="panel">
-        <div class="card" id="actionsCard">
-          <h3>Керування</h3>
-          <div class="row">
-            <div style="display: flex; align-items: end; gap: 8px">
-              <button id="checkBtn" disabled>Перевірити</button>
-              <button id="submitBtn" disabled>Надіслати</button>
-            </div>
-            <div>
-              <div class="hint">
-                Результат: <span id="score" class="score">0 / 0</span>
-              </div>
-              <div class="hint">
-                Час: <span id="elapsed" class="score">0 с</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    /* Контейнер */
+    .wrap{
+      position:relative; height:100dvh; width:100%;
+      display:grid; place-items:center; padding: clamp(16px, 3vw, 40px);
+    }
 
-        <div class="card" id="acrossCard" style="display: none">
-          <h3>Підказки — по горизонталі</h3>
-          <div id="clues-across" class="clues"></div>
-        </div>
-        <div class="card" id="downCard" style="display: none">
-          <h3>Підказки — по вертикалі</h3>
-          <div id="clues-down" class="clues"></div>
-        </div>
-      </div>
-    </div>
-    <script src="index.js"></script>
-  </body>
+    /* Скляна картка */
+    .card{
+      position:relative; width:min(880px, 92vw);
+      padding:clamp(24px, 4vw, 48px);
+      border-radius:28px;
+      background: rgba(var(--glass-bg), .22);
+      -webkit-backdrop-filter: blur(16px) saturate(130%);
+      backdrop-filter: blur(16px) saturate(130%);
+      box-shadow: var(--shadow);
+      transform-style: preserve-3d;
+      transition: transform .25s ease;
+      isolation:isolate;
+    }
+    /* Градієнтна рамка */
+    .card::before{
+      content:""; position:absolute; inset:0; border-radius:inherit; padding:2px;
+      background: linear-gradient(135deg, rgba(124,58,237,.8), rgba(34,211,238,.8), rgba(245,158,11,.8));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; /* вирізати середину */
+      pointer-events:none; z-index:-1;
+    }
+
+    /* Трофей-іконка */
+    .badge{ width: clamp(54px, 8vw, 86px); height:auto; display:block; margin-bottom:clamp(12px, 2vh, 18px); }
+    .badge drop-shadow{ filter: drop-shadow(0 10px 20px rgba(124,58,237,.35)); }
+
+    /* Заголовок */
+    h1{
+      margin:0 0 .5rem; line-height:1.05;
+      font-size:clamp(28px, 5vw, 56px); font-weight:800; letter-spacing:.2px;
+      background: linear-gradient(90deg, #fff, #c7d2fe 20%, #a7f3d0 40%, #fde68a 60%, #fca5a5 80%, #fff);
+      background-size: 200% auto; -webkit-background-clip:text; background-clip:text; color:transparent;
+      animation: shine 9s linear infinite;
+    }
+    @keyframes shine { to { background-position: 200% center } }
+    h1 .smile{ opacity:.85; font-weight:700 }
+
+    p{ margin:0 0 1.25rem; color:var(--muted); font: 500 clamp(14px, 1.7vw, 18px)/1.6 "Poppins", system-ui, sans-serif }
+
+    .actions{ display:flex; flex-wrap:wrap; gap:12px }
+    .btn{
+      --p: .12turn;
+      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.6rem;
+      padding:14px 20px; border-radius:14px; font-weight:700; text-decoration:none; overflow:hidden;
+      border:1px solid rgba(255,255,255,.18); outline:none; cursor:pointer; user-select:none;
+      transition: transform .15s ease, filter .2s ease, background .2s ease;
+    }
+    .btn.primary{
+      background: conic-gradient(from var(--p), var(--c-1), var(--c-2), var(--c-3), var(--c-4), var(--c-1));
+      color:#0b0f1a;
+      box-shadow: 0 10px 30px rgba(124,58,237,.35), inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    .btn.outline{ background: rgba(255,255,255,.06); color:#e7eaff }
+    .btn:hover{ transform: translateY(-1px) }
+    .btn:active{ transform: translateY(0) scale(.99) }
+    .btn::after{
+      content:""; position:absolute; inset:-100% -30%; background: linear-gradient(90deg, rgba(255,255,255,.0), rgba(255,255,255,.22), rgba(255,255,255,.0));
+      transform: translateX(-200%); animation: sweep 3.6s ease-in-out infinite; pointer-events:none;
+    }
+    .btn.primary::after{ animation-delay:.8s }
+    @keyframes sweep { 50%{ transform:translateX(0) } to{ transform: translateX(200%) } }
+
+    /* Підпис внизу */
+    footer{ position:fixed; left:0; right:0; bottom:10px; display:flex; justify-content:center; gap:24px; font: 500 12px/1.2 "Poppins", sans-serif; color: rgba(230,235,255,.6) }
+    footer a{ color:inherit; text-decoration:none; border-bottom:1px dashed rgba(230,235,255,.35) }
+    footer a:hover{ color:#fff; border-bottom-color:#fff }
+
+    /* Конфеті canvas поверх */
+    #confetti{ position:fixed; inset:0; pointer-events:none; z-index:2 }
+
+    /* Ефект нахилу */
+    .tilt{ perspective:1000px }
+
+    /* Reduced motion — поважаємо користувача */
+    @media (prefers-reduced-motion: reduce){
+      body::before, .b1,.b2,.b3, .stars, .btn::after, h1{ animation:none !important }
+    }
+  </style>
+</head>
+<body>
+  <!-- Фони та "космічний" настрій -->
+  <div class="stars" aria-hidden="true"></div>
+  <div class="blob b1" aria-hidden="true"></div>
+  <div class="blob b2" aria-hidden="true"></div>
+  <div class="blob b3" aria-hidden="true"></div>
+
+  <!-- Конфеті -->
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <main class="wrap tilt">
+    <section class="card" id="card" role="status" aria-live="polite" aria-label="Повідомлення про завершення конкурсу">
+      <!-- SVG-трофей з градієнтним контуром -->
+      <svg class="badge" viewBox="0 0 128 128" role="img" aria-label="Трофей">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c3aed"/>
+            <stop offset="50%" stop-color="#22d3ee"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#glow)">
+          <path d="M32 18h64v12a16 16 0 0 1-16 16H48A16 16 0 0 1 32 30V18z" fill="url(#g)" opacity=".15"/>
+          <path d="M32 18h64v12a16 16 0 0 1-16 16H48A16 16 0 0 1 32 30V18zM48 46v16a16 16 0 0 0 32 0V46" fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M40 80h48l8 18H32l8-18z" fill="url(#g)" opacity=".15"/>
+          <path d="M40 80h48l8 18H32l8-18z" fill="none" stroke="url(#g)" stroke-width="4"/>
+        </g>
+      </svg>
+
+      <h1>Дякую, конкурс уже завершений<span class="smile">)</span></h1>
+      <p>Дякуємо всім за участь і емоції! Слідкуй за оновленнями — зовсім скоро буде щось нове й цікаве.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span>© <span id="y"></span> Бізін Сергій Ілліч ПЗ-221 за підтримки Задорожньої Еви ПЗ-222 та адміністрації коледжу</span>
+  </footer>
+
+  <script>
+    // =======================
+    //  UTIL: Reduced Motion?
+    // =======================
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // =======================
+    //  CONFETTI (Vanilla JS)
+    // =======================
+    (function(){
+      const canvas = document.getElementById('confetti');
+      const ctx = canvas.getContext('2d');
+      let w, h, dpi;
+      const colors = ['#7c3aed','#22d3ee','#f59e0b','#ef4444','#84cc16','#e879f9'];
+      let pieces = [];
+
+      function resize(){
+        dpi = window.devicePixelRatio || 1;
+        w = canvas.width = Math.floor(innerWidth * dpi);
+        h = canvas.height = Math.floor(innerHeight * dpi);
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      function rand(min, max){ return Math.random() * (max - min) + min }
+
+      function spawnBurst(cx, cy, count = 180){
+        for(let i=0;i<count;i++){
+          const angle = rand(0, Math.PI*2);
+          const speed = rand(2, 6) * (dpi);
+          pieces.push({
+            x: cx * dpi,
+            y: cy * dpi,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - rand(3,7) * dpi,
+            g: rand(0.05, .18) * dpi,
+            w: rand(6,14) * dpi,
+            h: rand(8,20) * dpi,
+            r: rand(0, Math.PI*2),
+            dr: rand(-.2,.2),
+            c: colors[(Math.random()*colors.length)|0],
+            life: rand(120, 220)
+          });
+        }
+      }
+
+      // Initial burst (slightly above center)
+      if(!prefersReducedMotion){
+        setTimeout(()=>spawnBurst(innerWidth/2, innerHeight*.35, 220), 250);
+        // Gentle drizzle
+        for(let i=0;i<80;i++) pieces.push({
+          x: rand(0,w), y: rand(-h,0), vx: rand(-.5,.5), vy: rand(1.5,3), g: rand(.02,.06),
+          w: rand(4,10), h: rand(6,14), r: rand(0, 6.28), dr: rand(-.05,.05), c: colors[(Math.random()*colors.length)|0], life: rand(200,420)
+        });
+      }
+
+      function draw(){
+        ctx.clearRect(0,0,w,h);
+        for(let i = pieces.length - 1; i >= 0; i--){
+          const p = pieces[i];
+          p.vy += p.g; p.x += p.vx; p.y += p.vy; p.r += p.dr; p.life--;
+          // recycle
+          if(p.y > h + 40 || p.life < 0){ pieces.splice(i,1); continue }
+          ctx.save();
+          ctx.translate(p.x, p.y); ctx.rotate(p.r);
+          ctx.fillStyle = p.c;
+          ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+          ctx.restore();
+        }
+        requestAnimationFrame(draw);
+      }
+      if(!prefersReducedMotion) requestAnimationFrame(draw);
+      else ctx.clearRect(0,0,w,h);
+
+      // Secondary bursts when user clicks
+      window.addEventListener('pointerdown', (e)=>{
+        if(prefersReducedMotion) return;
+        spawnBurst(e.clientX, e.clientY, 150);
+      }, {passive:true});
+    })();
+
+    // =======================
+    //  3D Tilt for the card
+    // =======================
+    (function(){
+      const card = document.getElementById('card');
+      const wrap = document.querySelector('.tilt');
+      if(!card || prefersReducedMotion) return;
+      let rect = card.getBoundingClientRect();
+      function onMove(e){
+        const x = (e.clientX - rect.left)/rect.width; // 0..1
+        const y = (e.clientY - rect.top)/rect.height; // 0..1
+        const rx = (y - .5) * -10; // rotateX
+        const ry = (x - .5) * 12;  // rotateY
+        card.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+      }
+      function onLeave(){ card.style.transform = 'rotateX(0deg) rotateY(0deg)' }
+      wrap.addEventListener('pointermove', onMove);
+      wrap.addEventListener('pointerleave', onLeave);
+      window.addEventListener('resize', ()=>{ rect = card.getBoundingClientRect() });
+    })();
+
+    // =======================
+    //  UX: Demo handlers
+    // =======================
+    document.getElementById('y').textContent = new Date().getFullYear();
+    document.getElementById('subscribeBtn').addEventListener('click', (e)=>{
+      e.preventDefault();
+      alert('Тут може бути підписка на новини або форма email.');
+    });
+    document.getElementById('policy').addEventListener('click', (e)=>{
+      e.preventDefault();
+      alert('Посилання на політику конфіденційності. Заміни href="#" на свій URL.');
+    });
+  </script>
+</body>
 </html>

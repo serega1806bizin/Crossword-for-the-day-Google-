@@ -1,111 +1,9 @@
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbwKhLZxcfvpr-vVQt-0spelgA0JnvM18gS-tx1bPNjfKesWPpy8awxZs8qr2KiXN8Mc1A/exec";
 
-const PUZZLE = {
-  size: 15,
-  entries: [
-    {
-      num: 1,
-      dir: "across",
-      row: 2,
-      col: 3,
-      answer: "ЮТУБ",
-      clue: "Відеоплатформа, що належить Google.",
-    },
-    {
-      num: 3,
-      dir: "across",
-      row: 4,
-      col: 2,
-      answer: "ПЕЙДЖРАНК",
-      clue: "Алгоритм ранжування сторінок.",
-    },
-    {
-      num: 8,
-      dir: "across",
-      row: 6,
-      col: 4,
-      answer: "БРІН",
-      clue: "Прізвище співзасновника Google.",
-    },
-    {
-      num: 5,
-      dir: "across",
-      row: 7,
-      col: 9,
-      answer: "ГУГОЛ",
-      clue: "Число яке використав Google для своєї назви.",
-    },
-    {
-      num: 10,
-      dir: "across",
-      row: 8,
-      col: 4,
-      answer: "ХРОМ",
-      clue: "Популярний браузер від Google.",
-    },
-    {
-      num: 7,
-      dir: "across",
-      row: 9,
-      col: 12,
-      answer: "ДУДЛ",
-      clue: "Святковий малюнок на головній сторінці Google.",
-    },
-    {
-      num: 9,
-      dir: "across",
-      row: 10,
-      col: 2,
-      answer: "ПЕЙДЖ",
-      clue: "Один із співзасновників Google.",
-    },
-    {
-      num: 11,
-      dir: "across",
-      row: 12,
-      col: 1,
-      answer: "ДІПМАЙНД",
-      clue: "Лабораторія ШІ, що належить Google.",
-    },
-
-    // ——— Down (вертикаль) ———
-    // стоим так, чтобы пересечения с (2) шли по совпадающим буквам
-    {
-      num: 2,
-      dir: "down",
-      row: 1,
-      col: 5,
-      answer: "СУНДАРАРАДЖАН",
-      clue: "Імя головного директора Google.",
-    }, // пересекает (2) по букве «Р» в колонке 5
-    {
-      num: 4,
-      dir: "down",
-      row: 4,
-      col: 10,
-      answer: "КЛАУД",
-      clue: "Хмарні сервіси від Google.",
-    }, // пересекает (2) по «І» в колонке 6
-    {
-      num: 6,
-      dir: "down",
-      row: 3,
-      col: 12,
-      answer: "АНДРОЇД",
-      clue: "ОС для смартфонів від Google.",
-    },
-    {
-      num: 12,
-      dir: "down",
-      row: 2,
-      col: 8,
-      answer: "США",
-      clue: "Країна заснування Google.",
-    },
-  ],
-};
-
+let PUZZLE = null;  
+let grid = [];  
+const inputsByPos = new Map(); 
 // ---------- маленькие UI-утилиты ----------
 let toastTimer;
 function showToast(text, type = "info") {
@@ -125,17 +23,7 @@ function showResultModal(title, html) {
   box.innerHTML = html;
   document.getElementById("resultOverlay").style.display = "flex";
 }
-document.getElementById("closeResult").addEventListener("click", () => {
-  document.getElementById("resultOverlay").style.display = "none";
-});
 
-function setInputsEnabled(on) {
-  inputsByPos.forEach((inp) => (inp.disabled = !on));
-  document.getElementById("checkBtn").disabled = !on;
-  document.getElementById("submitBtn").disabled = !on;
-}
-
-const submitBtn = document.getElementById("submitBtn");
 function setSubmitting(on) {
   if (on) {
     submitBtn.dataset.label = submitBtn.textContent;
@@ -146,6 +34,38 @@ function setSubmitting(on) {
     submitBtn.disabled = false;
   }
 }
+
+function setInputsEnabled(on) {
+  inputsByPos.forEach((inp) => (inp.disabled = !on));
+  document.getElementById("checkBtn").disabled = !on;
+  document.getElementById("submitBtn").disabled = !on;
+}
+
+function toMMSS(s) {
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function startTimer() {
+  startedAt = Date.now();
+  tickTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - startedAt) / 1000);
+    document.getElementById("elapsed").textContent = `${sec} с`;
+    document.getElementById("timer").textContent = toMMSS(sec);
+  }, 250);
+}
+
+function stopTimer() {
+  if (tickTimer) clearInterval(tickTimer);
+}
+
+document.getElementById("closeResult").addEventListener("click", () => {
+  document.getElementById("resultOverlay").style.display = "none";
+});
+
+
+const submitBtn = document.getElementById("submitBtn");
 
 // ---------- построение сетки ----------
 const gridEl = document.getElementById("grid");
@@ -258,22 +178,23 @@ document.getElementById("downCard").style.display = "none";
 // таймер
 let startedAt = null,
   tickTimer = null;
-function startTimer() {
-  startedAt = Date.now();
-  tickTimer = setInterval(() => {
-    const sec = Math.floor((Date.now() - startedAt) / 1000);
-    document.getElementById("elapsed").textContent = `${sec} с`;
-    document.getElementById("timer").textContent = toMMSS(sec);
-  }, 250);
-}
+
 function stopTimer() {
   if (tickTimer) clearInterval(tickTimer);
 }
-function toMMSS(s) {
-  const mm = String(Math.floor(s / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${mm}:${ss}`;
+
+
+// Загружаем скелет пазла с сервера (без ответов)
+async function loadPuzzleSkeleton(eventName) {
+  const url = new URL(WEB_APP_URL);
+  url.searchParams.set('action','puzzle');
+  url.searchParams.set('event', eventName || 'День народження Google');
+  const resp = await fetch(url.toString());
+  const j = await resp.json();
+  if (!j.ok) throw new Error('Не удалось загрузить пазл');
+  return j.puzzle; // { size, entries: [{num,dir,row,col,len,clue}] }
 }
+
 
 // проверка
 function check() {
@@ -309,94 +230,124 @@ function collectAnswers() {
   return answers;
 }
 
+async function checkOnServer() {
+  const answers = collectAnswers(); // как сейчас, map { "num-dir": {typed, clue, expected?} }
+  // expected можно не слать, но если слать — на сервере мы его игнорим
+
+  const res = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'check',
+      event: document.getElementById('event').value.trim() || 'День народження Google',
+      answers
+    })
+  });
+  const j = await res.json();
+  if (!j.ok) throw new Error('check failed');
+  // j.hits — объект: ключ "num-dir" -> массив true/false по символам
+  // j.score — {correct,total}
+  return j;
+}
+
 // кнопки
-document.getElementById("checkBtn").addEventListener("click", () => {
-  const s = check();
-  showToast(`Перевірено: ${s.correct}/${s.total}`, "info");
+document.getElementById("checkBtn").addEventListener("click", async () => {
+  try {
+    const { hits, score } = await checkOnServer();
+
+    // Подсветка ячеек по hits (не раскрывая буквы)
+    for (const ent of PUZZLE.entries) {
+      const id = `${ent.num}-${ent.dir}`;
+      const arr = hits[id] || [];
+      for (let i=0;i<arr.length;i++){
+        const r = ent.row - 1 + (ent.dir === "down" ? i : 0);
+        const c = ent.col - 1 + (ent.dir === "across" ? i : 0);
+        const inp = inputsByPos.get(`${r},${c}`);
+        if (!inp) continue;
+        inp.style.background = arr[i] ? "var(--ok)" : (inp.value ? "var(--bad)" : "");
+      }
+    }
+
+    document.getElementById("score").textContent = `${score.correct} / ${score.total}`;
+    showToast(`Перевірено: ${score.correct}/${score.total}`, "info");
+  } catch(e) {
+    console.error(e);
+    showToast('Помилка перевірки', 'danger');
+  }
 });
 
-document.getElementById("startBtn").addEventListener("click", () => {
-  document.getElementById("acrossCard").style.display = "";
-  document.getElementById("downCard").style.display = "";
-  setInputsEnabled(true);
-  document.getElementById("overlay").style.display = "none";
-  startTimer();
-  inputsByPos.get("0,0")?.focus();
+
+document.getElementById("startBtn").addEventListener("click", async () => {
+  const eventName = document.getElementById("event").value.trim() || 'День народження Google';
+  try {
+    // грузим пазл
+    const puzzle = await loadPuzzleSkeleton(eventName);
+    PUZZLE = puzzle; // теперь без ответов
+    buildGridAndClues(PUZZLE); // твоя функция сборки сетки, используй entry.len
+    // далее как раньше:
+    document.getElementById("acrossCard").style.display = "";
+    document.getElementById("downCard").style.display = "";
+    setInputsEnabled(true);
+    document.getElementById("overlay").style.display = "none";
+    startTimer();
+    inputsByPos.get("0,0")?.focus();
+  } catch(e) {
+    showToast('Не вдалося завантажити пазл', 'danger');
+    console.error(e);
+  }
 });
+
 
 document.getElementById("submitBtn").addEventListener("click", async () => {
-  const score = check();
-  const durationSec = startedAt
-    ? Math.floor((Date.now() - startedAt) / 1000)
-    : null;
-
+  const durationSec = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : null;
   const payload = {
-    event: document.getElementById("event").value.trim(),
-    team: document.getElementById("team").value.trim(),
-    participant: document.getElementById("participant").value.trim(),
+    event: document.getElementById('event').value.trim() || 'День народження Google',
+    team: document.getElementById('team').value.trim(),
+    participant: document.getElementById('participant').value.trim(),
     answers: collectAnswers(),
-    score,
     durationSec,
-    userAgent: navigator.userAgent,
+    userAgent: navigator.userAgent
   };
-
-  if (!WEB_APP_URL || WEB_APP_URL.includes("PASTE_YOUR")) {
-    showToast("Встав WEB_APP_URL у коді", "danger");
-    return;
-  }
 
   try {
     setSubmitting(true);
+    // одна серверная операция: проверил + записал
     const res = await fetch(WEB_APP_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload) // без action => сервер записывает, считая score сам
     });
-    const ok =
-      res.ok &&
-      (
-        await res
-          .clone()
-          .json()
-          .catch(() => ({ ok: true }))
-      ).ok !== false;
-    if (!ok) {
-      showToast("Помилка збереження", "danger");
-      setSubmitting(false);
-      return;
-    }
+    const j = await res.json();
+    if (!j.ok) throw new Error('save failed');
 
-    // Запитати найкращий результат
+    const score = j.score; // от сервера
+    // далее как у тебя: best
     const url = new URL(WEB_APP_URL);
-    url.searchParams.set("action", "best");
-    url.searchParams.set("event", payload.event);
-    const bestResp = await fetch(url.toString(), { method: "GET" });
+    url.searchParams.set('action','best');
+    url.searchParams.set('event', payload.event);
+    const bestResp = await fetch(url.toString(), { method:'GET' });
     const best = (await bestResp.json()).best;
 
-    let html;
-    if (!best) {
-      html = `Вітаю! На даний момент ви найкращі!<br>Очікуйте завершення конкурсу.<br><br><b>Ваш час:</b> ${toMMSS(
-        durationSec
-      )}<br><b>Бал:</b> ${score.correct}/${score.total}`;
-    } else {
-      const myBetter =
-        score.correct > best.correct ||
-        (score.correct === best.correct && durationSec < best.durationSec);
-      html =
-        (myBetter
-          ? "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу."
-          : "На жаль, вже є учасник, який показав кращий результат (більше правильних або швидше).") +
-        `<br><br><b>Ваш час:</b> ${toMMSS(durationSec)} | <b>Бал:</b> ${
-          score.correct
-        }/${score.total}`;
-    }
+    const myAcc = score.total ? (score.correct / score.total) : 0;
+    const bestAcc = best && best.total ? (best.correct / best.total) : 0;
+    const eps = 1e-9;
+    const myBetter = (myAcc > bestAcc + eps) ||
+                     (Math.abs(myAcc - bestAcc) <= eps && durationSec < best.durationSec);
+
+    const html = (myBetter
+      ? "Вітаю! На даний момент ви найкращі! Очікуйте завершення конкурсу."
+      : "На жаль, вже є учасник, який показав кращий результат (більше правильних або швидше).")
+      + `<br><br><b>Ваш час:</b> ${toMMSS(durationSec)} | <b>Бал:</b> ${score.correct}/${score.total}
+         <br><b>Точність:</b> ${Math.round(myAcc*100)}%`;
+
     stopTimer();
-    showResultModal("Результат", html);
-    showToast("Відправлено в таблицю", "success");
-  } catch (e) {
+    showResultModal('Результат', html);
+    showToast('Відправлено в таблицю', 'success');
+  } catch(e) {
     console.error(e);
-    showToast("Помилка відправлення: " + e.message, "danger");
+    showToast('Помилка відправлення', 'danger');
   } finally {
     setSubmitting(false);
   }
 });
+
